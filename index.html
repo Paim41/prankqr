@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PrankQR – Interactive Prank QR Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<style>
+:root {
+  --maroon: #6b0f1a;
+  --crimson: #c1121f;
+  --rose: #e63946;
+  --rose-gold: #c9a87c;
+  --bg: #0a0a0d;
+  --bg2: #111116;
+  --panel: rgba(20,10,12,0.75);
+  --border: rgba(193,18,31,0.25);
+  --text: #f0e6e8;
+  --muted: #8a7a7d;
+  --glass: rgba(107,15,26,0.12);
+  --glow: #c1121f;
+  --white: #fff;
+  --card-bg: rgba(18,8,10,0.8);
+  --input-bg: rgba(30,10,14,0.6);
+  --transition: 0.35s cubic-bezier(.4,0,.2,1);
+}
+[data-theme="light"] {
+  --bg: #f5eaec;
+  --bg2: #ede0e2;
+  --panel: rgba(255,245,246,0.82);
+  --border: rgba(193,18,31,0.22);
+  --text: #1a0608;
+  --muted: #7a5560;
+  --glass: rgba(193,18,31,0.07);
+  --card-bg: rgba(255,248,249,0.85);
+  --input-bg: rgba(255,240,242,0.7);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Syne', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background var(--transition), color var(--transition);
+  cursor: none;
+}
+
+/* ─── CURSOR ─── */
+#cursor {
+  position: fixed; width: 18px; height: 18px;
+  border-radius: 50%; background: var(--crimson);
+  pointer-events: none; z-index: 9999;
+  transform: translate(-50%,-50%);
+  transition: transform 0.08s, width 0.2s, height 0.2s, opacity 0.2s;
+  mix-blend-mode: screen;
+  filter: blur(1px);
+}
+#cursor-ring {
+  position: fixed; width: 40px; height: 40px;
+  border-radius: 50%; border: 1.5px solid var(--crimson);
+  pointer-events: none; z-index: 9998;
+  transform: translate(-50%,-50%);
+  transition: transform 0.18s, width 0.25s, height 0.25s, opacity 0.2s;
+  opacity: 0.5;
+}
+
+/* ─── BACKGROUND ─── */
+#bg-canvas {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;
+}
+.bg-gradient {
+  position: fixed; inset: 0; z-index: 0;
+  background: radial-gradient(ellipse 80% 60% at 20% 30%, rgba(107,15,26,0.35) 0%, transparent 70%),
+              radial-gradient(ellipse 60% 80% at 80% 70%, rgba(193,18,31,0.18) 0%, transparent 70%),
+              var(--bg);
+  pointer-events: none;
+  transition: background var(--transition);
+}
+
+/* ─── LAYOUT ─── */
+.page-wrap {
+  position: relative; z-index: 1;
+  max-width: 1140px; margin: 0 auto;
+  padding: 0 24px 80px;
+}
+
+/* ─── NAV ─── */
+nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 22px 0 18px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+  backdrop-filter: blur(18px);
+  background: rgba(10,10,13,0.6);
+  margin: 0 -24px; padding: 18px 24px;
+}
+[data-theme="light"] nav { background: rgba(245,234,236,0.75); }
+
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 1.35rem; font-weight: 800; letter-spacing: -0.02em;
+  color: var(--text);
+}
+.logo-dot { color: var(--crimson); }
+.logo-icon {
+  width: 32px; height: 32px; background: var(--crimson);
+  border-radius: 8px; display: grid; place-items: center;
+  box-shadow: 0 0 18px rgba(193,18,31,0.5);
+}
+
+.nav-right { display: flex; align-items: center; gap: 14px; }
+
+.btn-theme {
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: 50px; padding: 8px 16px;
+  color: var(--text); cursor: none;
+  display: flex; align-items: center; gap: 7px;
+  font-family: 'Space Mono', monospace; font-size: 0.75rem;
+  transition: all var(--transition);
+}
+.btn-theme:hover { background: var(--crimson); border-color: var(--crimson); color: #fff; }
+
+/* ─── HERO ─── */
+.hero {
+  text-align: center; padding: 64px 0 48px;
+}
+.hero-tag {
+  display: inline-block;
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: 50px; padding: 5px 16px;
+  font-family: 'Space Mono', monospace; font-size: 0.72rem;
+  color: var(--rose); letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 22px;
+  animation: fadeUp 0.8s ease both;
+}
+.hero h1 {
+  font-size: clamp(2.4rem, 6vw, 4.5rem);
+  font-weight: 800; line-height: 1.05;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--text) 40%, var(--rose) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  animation: fadeUp 0.9s 0.1s ease both;
+}
+.hero p {
+  margin-top: 18px; font-size: 1.05rem; color: var(--muted); max-width: 520px; margin-inline: auto;
+  animation: fadeUp 0.9s 0.2s ease both;
+}
+
+@keyframes fadeUp { from { opacity:0; transform: translateY(24px); } to { opacity:1; transform:none; } }
+
+/* ─── TABS ─── */
+.tabs {
+  display: flex; gap: 4px;
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 14px; padding: 5px; width: fit-content; margin: 0 auto 40px;
+  animation: fadeUp 0.9s 0.3s ease both;
+}
+.tab {
+  padding: 10px 24px; border-radius: 10px; border: none;
+  background: transparent; color: var(--muted); cursor: none;
+  font-family: 'Syne', sans-serif; font-weight: 600; font-size: 0.9rem;
+  transition: all var(--transition);
+}
+.tab.active { background: var(--crimson); color: #fff; box-shadow: 0 0 18px rgba(193,18,31,0.45); }
+.tab:hover:not(.active) { color: var(--text); background: var(--glass); }
+
+/* ─── PANELS ─── */
+.panel { display: none; }
+.panel.active { display: block; animation: fadeUp 0.5s ease both; }
+
+/* ─── GENERATOR ─── */
+.gen-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 28px;
+}
+@media(max-width:720px) { .gen-grid { grid-template-columns: 1fr; } }
+
+.glass-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 20px; padding: 28px;
+  backdrop-filter: blur(20px);
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+.glass-card:hover { border-color: rgba(193,18,31,0.5); box-shadow: 0 8px 40px rgba(193,18,31,0.12); }
+
+.card-title {
+  font-size: 1rem; font-weight: 700; margin-bottom: 18px;
+  display: flex; align-items: center; gap: 9px; color: var(--text);
+}
+.card-icon { color: var(--crimson); }
+
+/* DROP ZONE */
+.drop-zone {
+  border: 2px dashed var(--border); border-radius: 14px;
+  min-height: 200px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  cursor: none; transition: all var(--transition);
+  background: var(--input-bg); position: relative; overflow: hidden;
+}
+.drop-zone.dragover {
+  border-color: var(--crimson); background: rgba(193,18,31,0.08);
+  transform: scale(1.01);
+}
+.drop-zone img.preview {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  border-radius: 12px; opacity: 0.85;
+}
+.drop-zone .dz-overlay {
+  position: absolute; inset: 0; background: rgba(10,10,13,0.55);
+  border-radius: 12px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+  opacity: 0; transition: opacity var(--transition);
+}
+.drop-zone:hover .dz-overlay { opacity: 1; }
+.drop-icon { color: var(--crimson); }
+.drop-label { font-size: 0.9rem; color: var(--muted); text-align: center; }
+.drop-sub { font-size: 0.75rem; color: var(--muted); opacity: 0.6; font-family: 'Space Mono',monospace; }
+
+/* INPUTS */
+.field { margin-top: 16px; }
+.field label { font-size: 0.8rem; color: var(--muted); display: block; margin-bottom: 7px; font-family:'Space Mono',monospace; letter-spacing:0.04em; }
+.field input, .field select {
+  width: 100%; background: var(--input-bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 11px 14px; color: var(--text);
+  font-family: 'Syne', sans-serif; font-size: 0.9rem;
+  outline: none; transition: border-color var(--transition);
+}
+.field input:focus, .field select:focus { border-color: var(--crimson); }
+.field select option { background: #1a0608; }
+
+/* QR OUTPUT */
+.qr-output {
+  min-height: 200px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px;
+}
+#qr-container {
+  background: #fff; border-radius: 12px; padding: 14px;
+  box-shadow: 0 0 30px rgba(193,18,31,0.25);
+  display: none;
+  animation: qrPulse 2s ease infinite;
+}
+@keyframes qrPulse {
+  0%,100% { box-shadow: 0 0 20px rgba(193,18,31,0.2); }
+  50% { box-shadow: 0 0 40px rgba(193,18,31,0.45); }
+}
+.qr-placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  color: var(--muted); font-size: 0.9rem;
+}
+.qr-placeholder svg { opacity: 0.3; }
+
+.qr-url-box {
+  width: 100%; background: var(--input-bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px;
+  font-family: 'Space Mono', monospace; font-size: 0.72rem;
+  color: var(--muted); word-break: break-all; display: none;
+}
+
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; }
+
+/* BUTTONS */
+.btn {
+  flex: 1; min-width: 120px;
+  padding: 12px 18px; border-radius: 12px; border: none;
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.88rem;
+  cursor: none; transition: all var(--transition);
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  position: relative; overflow: hidden;
+}
+.btn::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at var(--rx,50%) var(--ry,50%), rgba(255,255,255,0.18) 0%, transparent 70%);
+  opacity: 0; transition: opacity 0.3s;
+}
+.btn:hover::after { opacity: 1; }
+
+.btn-primary { background: var(--crimson); color: #fff; box-shadow: 0 4px 20px rgba(193,18,31,0.35); }
+.btn-primary:hover { background: var(--rose); transform: translateY(-2px); }
+.btn-ghost { background: var(--glass); border: 1px solid var(--border); color: var(--text); }
+.btn-ghost:hover { border-color: var(--crimson); color: var(--crimson); }
+.btn-danger { background: rgba(193,18,31,0.12); border: 1px solid rgba(193,18,31,0.3); color: var(--rose); }
+.btn-danger:hover { background: rgba(193,18,31,0.25); }
+
+.btn-generate {
+  width: 100%; margin-top: 20px;
+  padding: 15px; border-radius: 14px;
+  background: linear-gradient(135deg, var(--maroon), var(--crimson));
+  color: #fff; font-size: 1rem; font-weight: 800;
+  border: none; cursor: none;
+  box-shadow: 0 6px 28px rgba(193,18,31,0.4);
+  transition: all var(--transition); display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.btn-generate:hover { transform: translateY(-3px); box-shadow: 0 10px 40px rgba(193,18,31,0.55); }
+.btn-generate:active { transform: translateY(0); }
+
+/* ─── OPTIONS ─── */
+.options-row {
+  display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;
+}
+.option-pill {
+  background: var(--glass); border: 1px solid var(--border);
+  border-radius: 50px; padding: 7px 16px;
+  font-size: 0.78rem; color: var(--muted); cursor: none;
+  display: flex; align-items: center; gap: 7px;
+  transition: all var(--transition);
+  font-family:'Space Mono',monospace;
+}
+.option-pill.on { background: rgba(193,18,31,0.15); border-color: var(--crimson); color: var(--crimson); }
+.option-pill:hover { border-color: var(--crimson); color: var(--crimson); }
+
+/* ─── HISTORY ─── */
+.history-search {
+  display: flex; gap: 10px; margin-bottom: 24px;
+}
+.history-search input {
+  flex:1; background: var(--input-bg); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 16px; color: var(--text);
+  font-family:'Syne',sans-serif; font-size:0.9rem; outline:none;
+  transition: border-color var(--transition);
+}
+.history-search input:focus { border-color: var(--crimson); }
+
+.history-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 18px;
+}
+.history-card {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+  transition: all var(--transition);
+  animation: fadeUp 0.4s ease both;
+}
+.history-card:hover { transform: translateY(-4px); border-color: rgba(193,18,31,0.5); box-shadow: 0 8px 30px rgba(193,18,31,0.15); }
+.hc-thumb {
+  height: 140px; overflow: hidden; position: relative;
+  background: linear-gradient(135deg, var(--maroon), #1a0608);
+}
+.hc-thumb img { width:100%; height:100%; object-fit:cover; opacity:0.8; }
+.hc-badge {
+  position: absolute; top: 10px; right: 10px;
+  background: rgba(193,18,31,0.85); color: #fff;
+  font-family:'Space Mono',monospace; font-size:0.65rem;
+  padding: 3px 9px; border-radius: 50px;
+}
+.hc-body { padding: 14px; }
+.hc-name { font-weight: 700; font-size:0.88rem; margin-bottom:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hc-date { font-family:'Space Mono',monospace; font-size:0.68rem; color:var(--muted); margin-bottom:12px; }
+.hc-actions { display:flex; gap:7px; }
+.hc-actions .btn { min-width: auto; padding: 8px 12px; font-size:0.78rem; }
+
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--muted);
+}
+.empty-state svg { opacity:0.2; margin-bottom:16px; }
+.empty-state p { font-size:0.9rem; }
+
+/* ─── REVEAL PAGE OVERLAY ─── */
+#reveal-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: #000; display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif;
+}
+#reveal-overlay.show { display: flex; }
+
+.reveal-stage { width:100%; height:100%; position:relative; overflow:hidden; }
+
+/* Stage 1: Fake loader */
+#stage-load {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:100%; gap:24px;
+}
+.fake-logo {
+  font-size:1.1rem; font-family:'Space Mono',monospace;
+  color:#aaa; letter-spacing:0.1em; text-transform:uppercase;
+  animation: blink 1.2s ease infinite;
+}
+@keyframes blink { 0%,100%{opacity:0.5} 50%{opacity:1} }
+.spinner {
+  width: 64px; height: 64px;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: #c1121f;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.load-status {
+  font-family:'Space Mono',monospace; font-size:0.75rem; color:#555;
+  min-height:1.2em; text-align:center; max-width:340px;
+}
+.progress-bar-wrap {
+  width: 280px; height: 4px; background: rgba(255,255,255,0.08); border-radius:10px; overflow:hidden;
+}
+.progress-bar-fill {
+  height:100%; background: linear-gradient(90deg, #6b0f1a, #c1121f);
+  border-radius:10px; width:0%; transition: width 0.4s ease;
+}
+.countdown {
+  font-size: 3.5rem; font-weight: 800;
+  color: #c1121f; text-shadow: 0 0 30px rgba(193,18,31,0.8);
+  animation: countPulse 1s ease infinite;
+}
+@keyframes countPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+
+/* Stage 2: Reveal */
+#stage-reveal {
+  display:none; width:100%; height:100%;
+  align-items:center; justify-content:center;
+  flex-direction:column;
+}
+.reveal-img-wrap {
+  position:relative; max-width:90vw; max-height:80vh;
+  animation: glitchReveal 0.6s ease both;
+}
+@keyframes glitchReveal {
+  0% { transform: scale(0.6) rotate(-3deg); filter: brightness(3) saturate(0) hue-rotate(90deg); opacity:0; }
+  30% { filter: brightness(2) saturate(2) hue-rotate(30deg); transform: scale(1.06) rotate(1.5deg); }
+  60% { transform: scale(0.97) rotate(-0.5deg); filter: none; }
+  80% { transform: scale(1.02); }
+  100% { transform: scale(1) rotate(0); opacity:1; filter: none; }
+}
+.reveal-img-wrap img {
+  max-width:90vw; max-height:72vh; object-fit:contain;
+  border-radius:16px;
+  box-shadow: 0 0 80px rgba(193,18,31,0.5), 0 0 200px rgba(193,18,31,0.2);
+}
+.glitch-layer {
+  position:absolute; inset:0;
+  background: inherit; border-radius:16px;
+  animation: glitchShift 3s ease infinite;
+  pointer-events:none;
+  mix-blend-mode: screen;
+}
+@keyframes glitchShift {
+  0%,90%,100% { clip-path: none; transform:none; opacity:0; }
+  91% { clip-path: polygon(0 20%, 100% 20%, 100% 35%, 0 35%); transform: translate(-4px,0); opacity:0.4; filter: hue-rotate(120deg); }
+  93% { clip-path: polygon(0 60%, 100% 60%, 100% 72%, 0 72%); transform: translate(3px,0); opacity:0.3; }
+  95% { clip-path: none; transform: none; opacity:0; }
+}
+.reveal-caption {
+  margin-top: 20px; font-size:1.4rem; font-weight:800;
+  color:#fff; text-shadow: 0 0 20px rgba(193,18,31,0.8);
+  text-align:center; animation: fadeUp 0.5s 0.4s ease both;
+}
+.reveal-sub { color: #aaa; font-size:0.85rem; margin-top:6px; font-family:'Space Mono',monospace; animation: fadeUp 0.5s 0.6s ease both; }
+.reveal-controls {
+  margin-top:24px; display:flex; gap:12px;
+  animation: fadeUp 0.5s 0.8s ease both;
+}
+.r-btn {
+  padding: 12px 24px; border-radius: 12px; border:none;
+  font-family:'Syne',sans-serif; font-weight:700; font-size:0.88rem;
+  cursor:pointer; transition: all 0.25s;
+  display:flex; align-items:center; gap:8px;
+}
+.r-btn-close { background: rgba(255,255,255,0.12); color:#fff; }
+.r-btn-close:hover { background: rgba(255,255,255,0.22); }
+.r-btn-replay { background: #c1121f; color:#fff; box-shadow: 0 4px 20px rgba(193,18,31,0.5); }
+.r-btn-replay:hover { background: #e63946; transform: translateY(-2px); }
+
+/* Shake effect */
+.shake { animation: shake 0.5s ease; }
+@keyframes shake {
+  0%,100%{transform:none}
+  15%{transform:translate(-6px,2px) rotate(-2deg)}
+  30%{transform:translate(6px,-2px) rotate(2deg)}
+  45%{transform:translate(-4px,3px) rotate(-1deg)}
+  60%{transform:translate(4px,-1px) rotate(1deg)}
+  75%{transform:translate(-2px,1px)}
+}
+
+/* ─── PARTICLES ─── */
+.particle {
+  position: fixed; border-radius: 50%;
+  pointer-events: none; z-index: 0;
+  animation: floatParticle linear infinite;
+}
+@keyframes floatParticle {
+  0% { transform: translateY(100vh) scale(0.5); opacity:0; }
+  10% { opacity:0.6; }
+  90% { opacity:0.3; }
+  100% { transform: translateY(-80px) scale(1); opacity:0; }
+}
+
+/* ─── TOAST ─── */
+#toast {
+  position: fixed; bottom: 30px; left:50%; transform:translateX(-50%) translateY(80px);
+  background: var(--crimson); color: #fff; border-radius:12px;
+  padding: 12px 24px; font-weight:700; font-size:0.88rem;
+  box-shadow: 0 6px 30px rgba(193,18,31,0.45);
+  z-index:9990; transition: transform 0.35s cubic-bezier(.4,0,.2,1);
+  display:flex; align-items:center; gap:8px;
+  pointer-events:none;
+}
+#toast.show { transform:translateX(-50%) translateY(0); }
+
+/* ─── FOOTER ─── */
+footer {
+  text-align:center; padding-top:40px;
+  font-family:'Space Mono',monospace; font-size:0.72rem;
+  color: var(--muted); border-top: 1px solid var(--border);
+  margin-top: 60px;
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--maroon); border-radius:3px; }
+
+/* ─── REVEAL PAGE SCAN INDICATOR ─── */
+.scan-hint {
+  position: absolute; bottom: 20px; left:50%; transform: translateX(-50%);
+  font-family:'Space Mono',monospace; font-size:0.68rem; color:#444;
+  text-transform:uppercase; letter-spacing:0.12em;
+  display:flex; align-items:center; gap:8px;
+}
+.scan-dot { width:7px; height:7px; border-radius:50%; background:#c1121f; animation:blink 1s infinite; }
+
+/* Animated QR grid placeholder */
+.qr-grid-anim {
+  display: grid; grid-template-columns: repeat(7,1fr); gap:3px;
+  opacity:0.15; margin-bottom:8px;
+}
+.qr-cell {
+  width:10px; height:10px; border-radius:1px;
+  background: var(--muted);
+  animation: qrCellAnim 2s ease infinite;
+}
+
+input[type="file"] { display:none; }
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<div class="bg-gradient"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- TOAST -->
+<div id="toast">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toast-msg">Copied!</span>
+</div>
+
+<!-- REVEAL OVERLAY (shown when "Preview Prank" or simulating scan) -->
+<div id="reveal-overlay">
+  <div class="reveal-stage">
+    <div id="stage-load">
+      <div class="fake-logo">▌ Secure Verification</div>
+      <div class="spinner"></div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" id="prog-fill"></div></div>
+      <div class="load-status" id="load-status">Initializing…</div>
+      <div class="countdown" id="countdown" style="display:none"></div>
+    </div>
+    <div id="stage-reveal" style="display:flex; opacity:0;">
+      <div class="reveal-img-wrap" id="reveal-img-wrap">
+        <img id="reveal-img" src="" alt="Prank" />
+        <div class="glitch-layer"></div>
+      </div>
+      <div class="reveal-caption" id="reveal-caption">😱 GOT YA!</div>
+      <div class="reveal-sub" id="reveal-sub">You've been pranked! 🎉</div>
+      <div class="reveal-controls">
+        <button class="r-btn r-btn-replay" onclick="replayReveal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+          Replay
+        </button>
+        <button class="r-btn r-btn-close" onclick="closeReveal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Close
+        </button>
+      </div>
+      <div class="scan-hint"><div class="scan-dot"></div>PrankQR Demo Reveal</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="page-wrap">
+  <nav>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/><rect x="17" y="17" width="3" height="3"/>
+          <rect x="14" y="14" width="3" height="3"/>
+        </svg>
+      </div>
+      Prank<span class="logo-dot">QR</span>
+    </div>
+    <div class="nav-right">
+      <button class="btn-theme" onclick="toggleTheme()">
+        <svg id="theme-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <span id="theme-label">Light</span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <div class="hero-tag">🎭 Prank Generator v2.0</div>
+    <h1>Make Them Scan.<br/>Make Them Scream.</h1>
+    <p>Generate prank QR codes that reveal surprise images with dramatic effects. Share. Scan. Watch the chaos.</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('generate',this)">
+      <span>⚡ Generate</span>
+    </button>
+    <button class="tab" onclick="switchTab('history',this)">
+      <span>🗂 History</span>
+    </button>
+  </div>
+
+  <!-- GENERATE PANEL -->
+  <div class="panel active" id="panel-generate">
+    <div class="gen-grid">
+      <!-- LEFT: Upload + Config -->
+      <div>
+        <div class="glass-card">
+          <div class="card-title">
+            <svg class="card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload Prank Image
+          </div>
+          <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+            <svg class="drop-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <div class="drop-label">Drop image here or click to browse</div>
+            <div class="drop-sub">JPG, PNG, GIF, WEBP — max 5MB</div>
+            <div class="dz-overlay">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span style="color:#fff;font-size:0.85rem">Change Image</span>
+            </div>
+          </div>
+          <input type="file" id="file-input" accept="image/*" onchange="handleFile(this.files[0])"/>
+
+          <div class="field">
+            <label>PRANK TITLE</label>
+            <input type="text" id="prank-title" placeholder="GOT YA! 😱" />
+          </div>
+          <div class="field">
+            <label>PRANK SUBTITLE</label>
+            <input type="text" id="prank-sub" placeholder="You've been pranked! 🎉" />
+          </div>
+          <div class="field">
+            <label>REVEAL EFFECT</label>
+            <select id="reveal-effect">
+              <option value="glitch">⚡ Glitch Reveal</option>
+              <option value="zoom">🔍 Dramatic Zoom</option>
+              <option value="spin">🌀 Spin Entrance</option>
+              <option value="shake">💥 Shake Attack</option>
+            </select>
+          </div>
+
+          <div class="options-row">
+            <div class="option-pill on" id="pill-sound" onclick="togglePill(this,'sound')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              Sound FX
+            </div>
+            <div class="option-pill on" id="pill-countdown" onclick="togglePill(this,'countdown')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Countdown
+            </div>
+            <div class="option-pill" id="pill-shake" onclick="togglePill(this,'shake')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              Screen Shake
+            </div>
+          </div>
+
+          <button class="btn-generate" onclick="generateQR()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="17" y="17" width="3" height="3"/><rect x="14" y="14" width="3" height="3"/></svg>
+            Generate Prank QR
+          </button>
+        </div>
+      </div>
+
+      <!-- RIGHT: QR Output -->
+      <div>
+        <div class="glass-card" style="height:100%">
+          <div class="card-title">
+            <svg class="card-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="17" y="17" width="3" height="3"/></svg>
+            Your Prank QR
+          </div>
+
+          <div class="qr-output">
+            <div class="qr-placeholder" id="qr-placeholder">
+              <div class="qr-grid-anim">
+                <div class="qr-cell" style="animation-delay:0s"></div>
+                <div class="qr-cell" style="animation-delay:0.1s"></div>
+                <div class="qr-cell" style="animation-delay:0.05s"></div>
+                <div class="qr-cell" style="animation-delay:0.15s"></div>
+                <div class="qr-cell" style="animation-delay:0.08s"></div>
+                <div class="qr-cell" style="animation-delay:0.2s"></div>
+                <div class="qr-cell" style="animation-delay:0.03s"></div>
+                <div class="qr-cell" style="animation-delay:0.12s"></div>
+                <div class="qr-cell" style="animation-delay:0.07s"></div>
+                <div class="qr-cell" style="animation-delay:0.18s"></div>
+                <div class="qr-cell" style="animation-delay:0.04s"></div>
+                <div class="qr-cell" style="animation-delay:0.09s"></div>
+                <div class="qr-cell" style="animation-delay:0.14s"></div>
+                <div class="qr-cell" style="animation-delay:0.11s"></div>
+                <div class="qr-cell" style="animation-delay:0.06s"></div>
+                <div class="qr-cell" style="animation-delay:0.16s"></div>
+                <div class="qr-cell" style="animation-delay:0.02s"></div>
+                <div class="qr-cell" style="animation-delay:0.19s"></div>
+                <div class="qr-cell" style="animation-delay:0.13s"></div>
+                <div class="qr-cell" style="animation-delay:0.01s"></div>
+                <div class="qr-cell" style="animation-delay:0.17s"></div>
+                <div class="qr-cell" style="animation-delay:0.08s"></div>
+                <div class="qr-cell" style="animation-delay:0.05s"></div>
+                <div class="qr-cell" style="animation-delay:0.15s"></div>
+                <div class="qr-cell" style="animation-delay:0.1s"></div>
+                <div class="qr-cell" style="animation-delay:0.02s"></div>
+                <div class="qr-cell" style="animation-delay:0.18s"></div>
+                <div class="qr-cell" style="animation-delay:0.07s"></div>
+                <div class="qr-cell" style="animation-delay:0.12s"></div>
+                <div class="qr-cell" style="animation-delay:0.04s"></div>
+                <div class="qr-cell" style="animation-delay:0.09s"></div>
+                <div class="qr-cell" style="animation-delay:0.06s"></div>
+                <div class="qr-cell" style="animation-delay:0.14s"></div>
+                <div class="qr-cell" style="animation-delay:0.03s"></div>
+                <div class="qr-cell" style="animation-delay:0.11s"></div>
+                <div class="qr-cell" style="animation-delay:0.16s"></div>
+                <div class="qr-cell" style="animation-delay:0.19s"></div>
+                <div class="qr-cell" style="animation-delay:0.01s"></div>
+                <div class="qr-cell" style="animation-delay:0.13s"></div>
+                <div class="qr-cell" style="animation-delay:0.08s"></div>
+                <div class="qr-cell" style="animation-delay:0.05s"></div>
+                <div class="qr-cell" style="animation-delay:0.15s"></div>
+                <div class="qr-cell" style="animation-delay:0.18s"></div>
+                <div class="qr-cell" style="animation-delay:0.07s"></div>
+                <div class="qr-cell" style="animation-delay:0.12s"></div>
+                <div class="qr-cell" style="animation-delay:0.04s"></div>
+                <div class="qr-cell" style="animation-delay:0.09s"></div>
+                <div class="qr-cell" style="animation-delay:0.16s"></div>
+                <div class="qr-cell" style="animation-delay:0.02s"></div>
+              </div>
+              Upload an image and click "Generate"
+            </div>
+            <div id="qr-container"></div>
+          </div>
+
+          <div class="qr-url-box" id="qr-url-box"></div>
+
+          <div class="btn-row" id="qr-actions" style="display:none; margin-top:16px;">
+            <button class="btn btn-ghost" onclick="downloadQR()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download
+            </button>
+            <button class="btn btn-ghost" onclick="copyURL()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy URL
+            </button>
+            <button class="btn btn-primary" onclick="previewPrank()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Preview
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY PANEL -->
+  <div class="panel" id="panel-history">
+    <div class="history-search">
+      <input type="text" id="search-input" placeholder="🔍  Search pranks…" oninput="renderHistory()" />
+      <button class="btn btn-danger" onclick="clearHistory()" style="min-width:auto;padding:12px 18px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        Clear All
+      </button>
+    </div>
+    <div class="history-grid" id="history-grid"></div>
+  </div>
+
+<footer style="display:flex; align-items:center; justify-content:center; gap:6px; font-size:12px; padding:8px 0;">
+  <div style="width:20px; height:1px; background:#ccc;"></div>
+
+  <span style="opacity:0.7;">Crafted by</span>
+
+  <a href="https://github.com/Paim41" target="_blank" rel="noopener noreferrer"
+     style="display:flex; align-items:center; gap:4px; text-decoration:none; color:inherit;">
+    
+    <!-- Smaller GitHub icon -->
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.477 2 2 6.477 2 12c0 4.418 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.868-.013-1.703-2.782.603-3.369-1.342-3.369-1.342-.454-1.155-1.11-1.463-1.11-1.463-.908-.62.069-.607.069-.607 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0 1 12 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.202 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.163 22 16.418 22 12c0-5.523-4.477-10-10-10z"/>
+    </svg>
+
+    <span style="font-size:12px;">Paim41</span>
+  </a>
+
+  <div style="width:20px; height:1px; background:#ccc;"></div>
+</footer>
+</div>
+
+<script>
+// ─── STATE ───
+let currentImageData = null;
+let currentQRData = null;
+let options = { sound: true, countdown: true, shake: false };
+let qrInstance = null;
+let particles = [];
+
+// ─── CURSOR ───
+const cur = document.getElementById('cursor');
+const curRing = document.getElementById('cursor-ring');
+let mx = -100, my = -100, rx = -100, ry = -100;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cur.style.left = mx+'px'; cur.style.top = my+'px';
+});
+(function animRing(){
+  rx += (mx-rx)*0.12; ry += (my-ry)*0.12;
+  curRing.style.left = rx+'px'; curRing.style.top = ry+'px';
+  requestAnimationFrame(animRing);
+})();
+document.querySelectorAll('button,.tab,.option-pill,.drop-zone').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{ cur.style.width='28px';cur.style.height='28px';curRing.style.width='60px';curRing.style.height='60px';curRing.style.opacity='0.8'; });
+  el.addEventListener('mouseleave',()=>{ cur.style.width='18px';cur.style.height='18px';curRing.style.width='40px';curRing.style.height='40px';curRing.style.opacity='0.5'; });
+});
+
+// ─── CANVAS PARTICLES ───
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let W, H, pts=[];
+function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+resize(); window.addEventListener('resize',resize);
+
+for(let i=0;i<55;i++) pts.push({
+  x: Math.random()*window.innerWidth, y: Math.random()*window.innerHeight,
+  vx: (Math.random()-0.5)*0.4, vy: (Math.random()-0.5)*0.4,
+  r: Math.random()*1.8+0.4,
+  alpha: Math.random()*0.4+0.1,
+  color: Math.random()>0.5 ? '#6b0f1a' : '#c1121f'
+});
+(function drawCanvas(){
+  ctx.clearRect(0,0,W,H);
+  pts.forEach(p=>{
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x<0)p.x=W; if(p.x>W)p.x=0;
+    if(p.y<0)p.y=H; if(p.y>H)p.y=0;
+    // parallax toward mouse
+    let dx=(mx-p.x)*0.00005, dy=(my-p.y)*0.00005;
+    p.x+=dx; p.y+=dy;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=p.color;
+    ctx.globalAlpha=p.alpha;
+    ctx.fill();
+  });
+  // connections
+  ctx.globalAlpha=0.06;
+  for(let i=0;i<pts.length;i++) for(let j=i+1;j<pts.length;j++){
+    let dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y;
+    if(Math.sqrt(dx*dx+dy*dy)<120){
+      ctx.beginPath(); ctx.moveTo(pts[i].x,pts[i].y); ctx.lineTo(pts[j].x,pts[j].y);
+      ctx.strokeStyle='#c1121f'; ctx.lineWidth=0.6; ctx.stroke();
+    }
+  }
+  ctx.globalAlpha=1;
+  requestAnimationFrame(drawCanvas);
+})();
+
+// ─── THEME ───
+function toggleTheme(){
+  const html=document.documentElement;
+  const dark=html.getAttribute('data-theme')==='dark';
+  html.setAttribute('data-theme',dark?'light':'dark');
+  document.getElementById('theme-label').textContent=dark?'Dark':'Light';
+  const icon=document.getElementById('theme-icon');
+  if(!dark) icon.innerHTML='<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+  else icon.innerHTML='<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+}
+
+// ─── TABS ───
+function switchTab(tab, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-'+tab).classList.add('active');
+  if(tab==='history') renderHistory();
+}
+
+// ─── OPTION PILLS ───
+function togglePill(el, key){
+  el.classList.toggle('on');
+  options[key]=el.classList.contains('on');
+}
+
+// ─── DRAG & DROP ───
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault(); dz.classList.remove('dragover');
+  const f=e.dataTransfer.files[0];
+  if(f&&f.type.startsWith('image/')) handleFile(f);
+});
+
+function handleFile(file){
+  if(!file) return;
+  if(file.size>5*1024*1024){ showToast('Image too large (max 5MB)'); return; }
+  const reader=new FileReader();
+  reader.onload=e=>{
+    // Compress
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=800;
+      let w=img.width, h=img.height;
+      if(w>MAX||h>MAX){ const r=Math.min(MAX/w,MAX/h); w*=r; h*=r; }
+      const cv=document.createElement('canvas');
+      cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      currentImageData=cv.toDataURL('image/jpeg',0.82);
+      // Show preview
+      let preview=dz.querySelector('img.preview');
+      if(!preview){ preview=document.createElement('img'); preview.className='preview'; dz.prepend(preview); }
+      preview.src=currentImageData;
+      showToast('Image loaded! Click Generate.');
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─── GENERATE QR ───
+function generateQR(){
+  if(!currentImageData){ showToast('Please upload an image first!'); return; }
+
+  // Build encoded prank URL (self-referencing with data in hash)
+  const payload=JSON.stringify({
+    img: currentImageData,
+    title: document.getElementById('prank-title').value||'GOT YA! 😱',
+    sub: document.getElementById('prank-sub').value||"You've been pranked! 🎉",
+    effect: document.getElementById('reveal-effect').value,
+    sound: options.sound,
+    countdown: options.countdown,
+    shake: options.shake
+  });
+  const encoded=btoa(unescape(encodeURIComponent(payload)));
+  const url=window.location.href.split('#')[0]+'#reveal='+encoded;
+
+  currentQRData={url, encoded, title:document.getElementById('prank-title').value||'Prank'};
+
+  // Generate QR
+  const container=document.getElementById('qr-container');
+  container.innerHTML='';
+  container.style.display='block';
+  document.getElementById('qr-placeholder').style.display='none';
+
+  qrInstance=new QRCode(container,{
+    text: url, width:200, height:200,
+    colorDark:'#1a0608', colorLight:'#ffffff',
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  document.getElementById('qr-url-box').textContent=url;
+  document.getElementById('qr-url-box').style.display='block';
+  document.getElementById('qr-actions').style.display='flex';
+
+  // Save to history
+  saveToHistory({
+    id: Date.now(),
+    title: currentQRData.title,
+    img: currentImageData,
+    url: url,
+    encoded: encoded,
+    date: new Date().toLocaleDateString(),
+    effect: document.getElementById('reveal-effect').value
+  });
+
+  showToast('QR Code generated! 🎉');
+}
+
+// ─── DOWNLOAD QR ───
+function downloadQR(){
+  const img=document.querySelector('#qr-container img');
+  if(!img){ showToast('Generate a QR first!'); return; }
+  const a=document.createElement('a');
+  a.href=img.src; a.download='prank-qr.png'; a.click();
+  showToast('QR downloaded!');
+}
+
+// ─── COPY URL ───
+function copyURL(){
+  if(!currentQRData){ showToast('Generate a QR first!'); return; }
+  navigator.clipboard.writeText(currentQRData.url).then(()=>showToast('URL copied to clipboard!'));
+}
+
+// ─── PREVIEW PRANK ───
+function previewPrank(encoded){
+  let data;
+  if(encoded){
+    try{ data=JSON.parse(decodeURIComponent(escape(atob(encoded)))); }catch(e){ showToast('Invalid prank data'); return; }
+  } else {
+    if(!currentImageData){ showToast('Generate a QR first!'); return; }
+    data={
+      img: currentImageData,
+      title: document.getElementById('prank-title').value||'GOT YA! 😱',
+      sub: document.getElementById('prank-sub').value||"You've been pranked! 🎉",
+      effect: document.getElementById('reveal-effect').value,
+      sound: options.sound, countdown: options.countdown, shake: options.shake
+    };
+  }
+  startReveal(data);
+}
+
+// ─── REVEAL SEQUENCE ───
+const loadMessages=[
+  'Verifying identity…','Establishing secure connection…',
+  'Loading encrypted content…','Authenticating token…',
+  'Running security scan…','Decrypting payload…',
+  'Almost ready…'
+];
+let revealData=null;
+
+function startReveal(data){
+  revealData=data;
+  const overlay=document.getElementById('reveal-overlay');
+  overlay.classList.add('show');
+  document.getElementById('stage-load').style.display='flex';
+  const stageReveal=document.getElementById('stage-reveal');
+  stageReveal.style.display='flex'; stageReveal.style.opacity='0';
+  document.getElementById('countdown').style.display='none';
+  document.getElementById('prog-fill').style.width='0%';
+
+  let prog=0, msgIdx=0;
+  const msgs=document.getElementById('load-status');
+  msgs.textContent=loadMessages[0];
+
+  const interval=setInterval(()=>{
+    prog+=Math.random()*18+8;
+    if(prog>95) prog=95;
+    document.getElementById('prog-fill').style.width=prog+'%';
+    msgIdx=(msgIdx+1)%loadMessages.length;
+    msgs.textContent=loadMessages[msgIdx];
+  },450);
+
+  const countdownEl=document.getElementById('countdown');
+  setTimeout(()=>{
+    clearInterval(interval);
+    document.getElementById('prog-fill').style.width='100%';
+    msgs.textContent='Ready!';
+    if(data.countdown){
+      countdownEl.style.display='block';
+      let c=3;
+      countdownEl.textContent=c;
+      const ci=setInterval(()=>{
+        c--;
+        if(c<=0){ clearInterval(ci); showReveal(data); }
+        else countdownEl.textContent=c;
+      },1000);
+    } else {
+      setTimeout(()=>showReveal(data), 600);
+    }
+  }, 3200);
+}
+
+function showReveal(data){
+  document.getElementById('stage-load').style.display='none';
+  const sr=document.getElementById('stage-reveal');
+  document.getElementById('reveal-img').src=data.img||'';
+  document.getElementById('reveal-caption').textContent=data.title||'GOT YA!';
+  document.getElementById('reveal-sub').textContent=data.sub||"You've been pranked!";
+
+  // Effect
+  const wrap=document.getElementById('reveal-img-wrap');
+  wrap.style.animation='none';
+  void wrap.offsetWidth;
+  const effects={
+    glitch:'glitchReveal 0.7s ease both',
+    zoom:'zoomReveal 0.5s ease both',
+    spin:'spinReveal 0.6s ease both',
+    shake:'none'
+  };
+  wrap.style.animation=effects[data.effect]||effects.glitch;
+  sr.style.opacity='1';
+
+  if(data.shake){
+    document.getElementById('reveal-overlay').classList.add('shake');
+    setTimeout(()=>document.getElementById('reveal-overlay').classList.remove('shake'),600);
+  }
+
+  // Sound
+  if(data.sound) playAlarm();
+}
+
+function playAlarm(){
+  try{
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    const play=(freq,start,dur)=>{
+      const o=ac.createOscillator(), g=ac.createGain();
+      o.connect(g); g.connect(ac.destination);
+      o.type='sawtooth'; o.frequency.setValueAtTime(freq,ac.currentTime+start);
+      g.gain.setValueAtTime(0.25,ac.currentTime+start);
+      g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+start+dur);
+      o.start(ac.currentTime+start); o.stop(ac.currentTime+start+dur);
+    };
+    play(880,0,0.15); play(660,0.18,0.15); play(1100,0.36,0.2); play(440,0.58,0.3);
+  }catch(e){}
+}
+
+function closeReveal(){
+  document.getElementById('reveal-overlay').classList.remove('show');
+  window.location.hash='';
+}
+function replayReveal(){ if(revealData) startReveal(revealData); }
+
+// Extra keyframe styles
+const style=document.createElement('style');
+style.textContent=`
+@keyframes zoomReveal{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes spinReveal{from{transform:rotate(-180deg)scale(0);opacity:0}to{transform:none;opacity:1}}
+`;
+document.head.appendChild(style);
+
+// ─── HISTORY ───
+function saveToHistory(item){
+  let h=getHistory();
+  h.unshift(item);
+  if(h.length>30) h=h.slice(0,30);
+  localStorage.setItem('prankqr_history',JSON.stringify(h));
+}
+function getHistory(){ try{ return JSON.parse(localStorage.getItem('prankqr_history'))||[]; }catch(e){return[];} }
+
+function renderHistory(){
+  const q=(document.getElementById('search-input').value||'').toLowerCase();
+  const h=getHistory().filter(i=>!q||i.title.toLowerCase().includes(q));
+  const grid=document.getElementById('history-grid');
+  if(!h.length){
+    grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1">
+      <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="17" y="17" width="3" height="3"/></svg>
+      <p>No prank QRs yet!<br/>Generate one in the Generate tab.</p>
+    </div>`;
+    return;
+  }
+  grid.innerHTML=h.map(item=>`
+    <div class="history-card">
+      <div class="hc-thumb">
+        ${item.img?`<img src="${item.img}" alt="${item.title}"/>`:'' }
+        <div class="hc-badge">${item.effect||'glitch'}</div>
+      </div>
+      <div class="hc-body">
+        <div class="hc-name">${item.title}</div>
+        <div class="hc-date">${item.date}</div>
+        <div class="hc-actions">
+          <button class="btn btn-primary" style="font-size:0.78rem;padding:8px 12px" onclick="previewPrank('${item.encoded}')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Preview
+          </button>
+          <button class="btn btn-ghost" style="font-size:0.78rem;padding:8px 12px" onclick="restoreItem('${item.id}')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+            Load
+          </button>
+          <button class="btn btn-danger" style="font-size:0.78rem;padding:8px 12px" onclick="deleteItem(${item.id})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function deleteItem(id){
+  let h=getHistory().filter(i=>i.id!==id);
+  localStorage.setItem('prankqr_history',JSON.stringify(h));
+  renderHistory();
+  showToast('Deleted!');
+}
+function clearHistory(){
+  if(!confirm('Clear all history?')) return;
+  localStorage.removeItem('prankqr_history');
+  renderHistory();
+  showToast('History cleared');
+}
+function restoreItem(id){
+  const item=getHistory().find(i=>i.id==id);
+  if(!item) return;
+  currentImageData=item.img;
+  currentQRData={url:item.url, encoded:item.encoded, title:item.title};
+  document.getElementById('prank-title').value=item.title;
+  // switch tab
+  document.querySelectorAll('.tab').forEach((t,i)=>{ t.classList.toggle('active',i===0); });
+  document.querySelectorAll('.panel').forEach((p,i)=>{ p.classList.toggle('active',i===0); });
+  // restore preview
+  let dz=document.getElementById('drop-zone');
+  let preview=dz.querySelector('img.preview');
+  if(!preview){ preview=document.createElement('img'); preview.className='preview'; dz.prepend(preview); }
+  preview.src=item.img;
+  showToast('Loaded! Hit Generate to re-QR.');
+}
+
+// ─── TOAST ───
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  document.getElementById('toast-msg').textContent=msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ─── URL HASH CHECK (simulate scan) ───
+function checkHash(){
+  const hash=window.location.hash;
+  if(hash.startsWith('#reveal=')){
+    const encoded=hash.slice(8);
+    try{
+      const data=JSON.parse(decodeURIComponent(escape(atob(encoded))));
+      setTimeout(()=>startReveal(data),400);
+    }catch(e){}
+  }
+}
+checkHash();
+window.addEventListener('hashchange',checkHash);
+
+// ─── BUTTON RIPPLE ───
+document.addEventListener('click',e=>{
+  const btn=e.target.closest('.btn,.btn-generate');
+  if(!btn) return;
+  const r=document.createElement('span');
+  r.style.cssText=`position:absolute;border-radius:50%;background:rgba(255,255,255,0.25);
+    width:60px;height:60px;margin-top:-30px;margin-left:-30px;
+    animation:rippleAnim 0.6s linear;pointer-events:none;z-index:10;
+    left:${e.offsetX}px;top:${e.offsetY}px;`;
+  btn.appendChild(r);
+  setTimeout(()=>r.remove(),700);
+});
+const rs=document.createElement('style');
+rs.textContent='@keyframes rippleAnim{from{transform:scale(0);opacity:0.7}to{transform:scale(4);opacity:0}}';
+document.head.appendChild(rs);
+
+// ─── BUTTON MOUSE GRADIENT ───
+document.addEventListener('mousemove',e=>{
+  document.querySelectorAll('.btn').forEach(btn=>{
+    const rect=btn.getBoundingClientRect();
+    btn.style.setProperty('--rx',(e.clientX-rect.left)/rect.width*100+'%');
+    btn.style.setProperty('--ry',(e.clientY-rect.top)/rect.height*100+'%');
+  });
+});
+</script>
+</body>
+</html>
